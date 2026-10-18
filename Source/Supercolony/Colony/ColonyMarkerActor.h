@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "ColonyMarkerActor.generated.h"
 
+class UMaterialInterface;
 class UStaticMeshComponent;
 
 /** A coloured engine basic shape used as a placeholder for colony landmarks. No collision. */
@@ -23,4 +24,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Colony")
 	FLinearColor Color = FLinearColor::White;
+
+private:
+	/** Parent of the coloured material instance. Must have a vector parameter named "Color". */
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> BaseMaterial;
 };
