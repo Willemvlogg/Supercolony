@@ -1,0 +1,36 @@
+# Unreal Engine generated folders
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Build/
+Plugins/**/Binaries/
+Plugins/**/Intermediate/
+
+# IDE files
+.vs/
+.vscode/
+.idea/
+*.sln
+*.slnx
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.vcxproj*
+
+# Compiled files
+*.pdb
+*.dll
+*.exe
+*.obj
+*.lib
+
+# OS files
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Claude Code local settings (keep shared .claude/settings.json)
+.claude/settings.local.json
