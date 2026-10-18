@@ -37,27 +37,25 @@ namespace AntSteeringTests
 	}
 }
 
-using namespace AntSteeringTests;
-
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntSensorPositionsTest, "Supercolony.Ants.SensorPositions", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntSensorPositionsTest, "Supercolony.Ants.SensorPositions", AntSteeringTests::TestFlags)
 bool FAntSensorPositionsTest::RunTest(const FString& Parameters)
 {
 	FVector2D Left, Ahead, Right;
 	AntSteering::GetSensorPositions(FVector2D(100.f, 50.f), 0.f, FMath::DegreesToRadians(90.f), 200.f, Left, Ahead, Right);
-	TestTrue(TEXT("Ahead is Distance along the heading"), Ahead.Equals(FVector2D(300.f, 50.f), TestTolerance));
-	TestTrue(TEXT("Left is towards -Y when facing +X"), Left.Equals(FVector2D(100.f, -150.f), TestTolerance));
-	TestTrue(TEXT("Right is towards +Y when facing +X"), Right.Equals(FVector2D(100.f, 250.f), TestTolerance));
+	TestTrue(TEXT("Ahead is Distance along the heading"), Ahead.Equals(FVector2D(300.f, 50.f), AntSteeringTests::TestTolerance));
+	TestTrue(TEXT("Left is towards -Y when facing +X"), Left.Equals(FVector2D(100.f, -150.f), AntSteeringTests::TestTolerance));
+	TestTrue(TEXT("Right is towards +Y when facing +X"), Right.Equals(FVector2D(100.f, 250.f), AntSteeringTests::TestTolerance));
 
 	AntSteering::GetSensorPositions(FVector2D::ZeroVector, FMath::DegreesToRadians(90.f), FMath::DegreesToRadians(35.f), 200.f, Left, Ahead, Right);
-	TestTrue(TEXT("Ahead follows a rotated heading"), Ahead.Equals(FVector2D(0.f, 200.f), TestTolerance));
-	TestEqual(TEXT("All sensors sit at Distance"), static_cast<float>(Left.Size()), 200.f, TestTolerance);
-	TestEqual(TEXT("All sensors sit at Distance"), static_cast<float>(Right.Size()), 200.f, TestTolerance);
+	TestTrue(TEXT("Ahead follows a rotated heading"), Ahead.Equals(FVector2D(0.f, 200.f), AntSteeringTests::TestTolerance));
+	TestEqual(TEXT("All sensors sit at Distance"), static_cast<float>(Left.Size()), 200.f, AntSteeringTests::TestTolerance);
+	TestEqual(TEXT("All sensors sit at Distance"), static_cast<float>(Right.Size()), 200.f, AntSteeringTests::TestTolerance);
 	TestTrue(TEXT("Facing +Y, the left sensor is towards +X"), Left.X > 0.f);
 	TestTrue(TEXT("Facing +Y, the right sensor is towards -X"), Right.X < 0.f);
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntChooseTurnTest, "Supercolony.Ants.ChooseTurn", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntChooseTurnTest, "Supercolony.Ants.ChooseTurn", AntSteeringTests::TestFlags)
 bool FAntChooseTurnTest::RunTest(const FString& Parameters)
 {
 	TestEqual(TEXT("Strongest ahead goes straight"), AntSteering::ChooseTurn(1.f, 3.f, 2.f), 0.f);
@@ -70,7 +68,7 @@ bool FAntChooseTurnTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntWanderTest, "Supercolony.Ants.Wander", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntWanderTest, "Supercolony.Ants.Wander", AntSteeringTests::TestFlags)
 bool FAntWanderTest::RunTest(const FString& Parameters)
 {
 	const float TurnRate = FMath::DegreesToRadians(240.f);
@@ -89,37 +87,37 @@ bool FAntWanderTest::RunTest(const FString& Parameters)
 	bool bAllWithinStep = true;
 	for (int32 Index = 0; Index < 1000; ++Index)
 	{
-		bAllWithinStep &= FMath::Abs(AntSteering::ApplyWander(0.f, 0.3f, TurnRate, DeltaTime, Random)) <= MaxStep + TestTolerance;
+		bAllWithinStep &= FMath::Abs(AntSteering::ApplyWander(0.f, 0.3f, TurnRate, DeltaTime, Random)) <= MaxStep + AntSteeringTests::TestTolerance;
 	}
 	TestTrue(TEXT("At 60 fps a step is at most Strength * TurnRate * DeltaTime"), bAllWithinStep);
 
-	const float Variance30 = WanderVarianceAfterOneSecond(1.f / 30.f);
-	const float Variance120 = WanderVarianceAfterOneSecond(1.f / 120.f);
+	const float Variance30 = AntSteeringTests::WanderVarianceAfterOneSecond(1.f / 30.f);
+	const float Variance120 = AntSteeringTests::WanderVarianceAfterOneSecond(1.f / 120.f);
 	TestTrue(FString::Printf(TEXT("Spread after 1 s is frame-rate independent (30 fps %.4f vs 120 fps %.4f)"), Variance30, Variance120),
 		FMath::Abs(Variance30 - Variance120) < 0.1f * Variance120);
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntTurnTowardTest, "Supercolony.Ants.TurnToward", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntTurnTowardTest, "Supercolony.Ants.TurnToward", AntSteeringTests::TestFlags)
 bool FAntTurnTowardTest::RunTest(const FString& Parameters)
 {
-	TestTrue(TEXT("Small gap closes fully"), YawEquals(AntSteering::TurnToward(0.f, 0.1f, 0.5f), 0.1f));
-	TestTrue(TEXT("Large gap is limited by MaxStep"), YawEquals(AntSteering::TurnToward(0.f, 2.f, 0.5f), 0.5f));
-	TestTrue(TEXT("Turns left for a target on the left"), YawEquals(AntSteering::TurnToward(0.f, -2.f, 0.5f), -0.5f));
+	TestTrue(TEXT("Small gap closes fully"), AntSteeringTests::YawEquals(AntSteering::TurnToward(0.f, 0.1f, 0.5f), 0.1f));
+	TestTrue(TEXT("Large gap is limited by MaxStep"), AntSteeringTests::YawEquals(AntSteering::TurnToward(0.f, 2.f, 0.5f), 0.5f));
+	TestTrue(TEXT("Turns left for a target on the left"), AntSteeringTests::YawEquals(AntSteering::TurnToward(0.f, -2.f, 0.5f), -0.5f));
 
 	const float NearPi = FMath::DegreesToRadians(170.f);
 	TestTrue(TEXT("Takes the short way across +-180"),
-		YawEquals(AntSteering::TurnToward(NearPi, -NearPi, 0.5f), -NearPi));
+		AntSteeringTests::YawEquals(AntSteering::TurnToward(NearPi, -NearPi, 0.5f), -NearPi));
 	TestTrue(TEXT("Result stays wrapped"), FMath::Abs(AntSteering::TurnToward(NearPi, -NearPi + 0.1f, 1.f)) <= UE_PI);
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntKeepInBoundsTest, "Supercolony.Ants.KeepInBounds", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntKeepInBoundsTest, "Supercolony.Ants.KeepInBounds", AntSteeringTests::TestFlags)
 bool FAntKeepInBoundsTest::RunTest(const FString& Parameters)
 {
 	FVector2D Position(0.f, 0.f);
 	float Yaw = 0.3f;
-	TestFalse(TEXT("Inside the bounds nothing changes"), AntSteering::KeepInBounds(Position, Yaw, BoundsMin, BoundsMax));
+	TestFalse(TEXT("Inside the bounds nothing changes"), AntSteering::KeepInBounds(Position, Yaw, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax));
 	TestEqual(TEXT("Heading unchanged inside"), Yaw, 0.3f);
 
 	struct FWallCase
@@ -144,25 +142,25 @@ bool FAntKeepInBoundsTest::RunTest(const FString& Parameters)
 	{
 		Position = Case.Position;
 		Yaw = FMath::DegreesToRadians(Case.YawDegrees);
-		TestTrue(FString::Printf(TEXT("%s: clamped"), Case.Name), AntSteering::KeepInBounds(Position, Yaw, BoundsMin, BoundsMax));
-		TestTrue(FString::Printf(TEXT("%s: position"), Case.Name), Position.Equals(Case.ExpectedPosition, TestTolerance));
-		TestTrue(FString::Printf(TEXT("%s: heading reflected"), Case.Name), YawEquals(Yaw, FMath::DegreesToRadians(Case.ExpectedYawDegrees)));
+		TestTrue(FString::Printf(TEXT("%s: clamped"), Case.Name), AntSteering::KeepInBounds(Position, Yaw, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax));
+		TestTrue(FString::Printf(TEXT("%s: position"), Case.Name), Position.Equals(Case.ExpectedPosition, AntSteeringTests::TestTolerance));
+		TestTrue(FString::Printf(TEXT("%s: heading reflected"), Case.Name), AntSteeringTests::YawEquals(Yaw, FMath::DegreesToRadians(Case.ExpectedYawDegrees)));
 	}
 
 	Position = FVector2D(1010.f, 0.f);
 	Yaw = FMath::DegreesToRadians(150.f);
-	AntSteering::KeepInBounds(Position, Yaw, BoundsMin, BoundsMax);
-	TestTrue(TEXT("Already heading back in: heading kept"), YawEquals(Yaw, FMath::DegreesToRadians(150.f)));
+	AntSteering::KeepInBounds(Position, Yaw, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax);
+	TestTrue(TEXT("Already heading back in: heading kept"), AntSteeringTests::YawEquals(Yaw, FMath::DegreesToRadians(150.f)));
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntDepositRateTest, "Supercolony.Ants.DepositRate", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntDepositRateTest, "Supercolony.Ants.DepositRate", AntSteeringTests::TestFlags)
 bool FAntDepositRateTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Full rate on leaving a target"), AntSteering::GetDepositRate(1.f, 0.f, 20.f), 1.f, TestTolerance);
-	TestEqual(TEXT("1/e after one falloff time"), AntSteering::GetDepositRate(1.f, 20.f, 20.f), FMath::Exp(-1.f), TestTolerance);
-	TestEqual(TEXT("Scales with the base rate"), AntSteering::GetDepositRate(2.f, 20.f, 20.f), 2.f * FMath::Exp(-1.f), TestTolerance);
-	TestEqual(TEXT("Negative time counts as zero"), AntSteering::GetDepositRate(1.f, -5.f, 20.f), 1.f, TestTolerance);
+	TestEqual(TEXT("Full rate on leaving a target"), AntSteering::GetDepositRate(1.f, 0.f, 20.f), 1.f, AntSteeringTests::TestTolerance);
+	TestEqual(TEXT("1/e after one falloff time"), AntSteering::GetDepositRate(1.f, 20.f, 20.f), FMath::Exp(-1.f), AntSteeringTests::TestTolerance);
+	TestEqual(TEXT("Scales with the base rate"), AntSteering::GetDepositRate(2.f, 20.f, 20.f), 2.f * FMath::Exp(-1.f), AntSteeringTests::TestTolerance);
+	TestEqual(TEXT("Negative time counts as zero"), AntSteering::GetDepositRate(1.f, -5.f, 20.f), 1.f, AntSteeringTests::TestTolerance);
 
 	bool bDecreasing = true;
 	float Previous = AntSteering::GetDepositRate(1.f, 0.f, 20.f);
@@ -176,7 +174,7 @@ bool FAntDepositRateTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRollingEventCounterTest, "Supercolony.Colony.RollingEventCounter", TestFlags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRollingEventCounterTest, "Supercolony.Colony.RollingEventCounter", AntSteeringTests::TestFlags)
 bool FRollingEventCounterTest::RunTest(const FString& Parameters)
 {
 	FRollingEventCounter Counter(60.0);

@@ -13,7 +13,7 @@ public class Supercolony : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "DeveloperSettings", "MassEntity", "MassCommon", "MassSpawner", "MassMovement", "MassRepresentation" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "DeveloperSettings", "MassEntity", "MassCore", "MassCommon", "MassSpawner", "MassMovement", "MassRepresentation" });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

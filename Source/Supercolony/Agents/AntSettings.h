@@ -5,6 +5,8 @@
 #include "AntSettings.generated.h"
 
 class UMassEntityConfigAsset;
+class UMaterialInterface;
+class UStaticMesh;
 
 /** Tuning for ant agents. Shown under Project Settings > Game > Ants. Distances are in centimetres. */
 UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "Ants"))
@@ -65,4 +67,21 @@ public:
 	/** Ants stay at least this far inside the pheromone grid edge. */
 	UPROPERTY(Config, EditAnywhere, Category = "Targets", meta = (ClampMin = "0.0", Units = "Centimeters"))
 	float BoundsMargin = 50.f;
+
+	/** Mesh drawn for each ant, scaled to DotSize. Assumed to be 100 cm across, like the engine basic shapes. */
+	UPROPERTY(Config, EditAnywhere, Category = "Display")
+	TSoftObjectPtr<UStaticMesh> DotMesh;
+
+	/** Unlit material that reads its colour from per-instance custom data 0-2 (RGB). */
+	UPROPERTY(Config, EditAnywhere, Category = "Display")
+	TSoftObjectPtr<UMaterialInterface> DotMaterial;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Display", meta = (ClampMin = "1.0", Units = "Centimeters"))
+	float DotSize = 25.f;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Display")
+	FLinearColor SearchingColor = FLinearColor(0.9f, 0.9f, 0.9f);
+
+	UPROPERTY(Config, EditAnywhere, Category = "Display")
+	FLinearColor CarryingColor = FLinearColor(1.f, 0.6f, 0.f);
 };
