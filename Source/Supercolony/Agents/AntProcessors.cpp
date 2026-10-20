@@ -77,6 +77,16 @@ namespace
 		Ant.State = NewState;
 		Ant.Yaw = AntSteering::WrapYaw(Ant.Yaw + UE_PI);
 		Ant.TimeSinceTarget = 0.f;
+		Ant.DepositBoost = 1.f;
+	}
+
+	/** Whether any of the ant's three sensors picks up a Food trail at Position. */
+	bool SensesFoodTrail(const FPheromoneGrid& Grid, const FVector2D& Position, float Yaw, const UAntSettings& Settings)
+	{
+		FVector2D Left, Ahead, Right;
+		AntSteering::GetSensorPositions(Position, Yaw, FMath::DegreesToRadians(Settings.SensorAngle), Settings.SensorDistance, Left, Ahead, Right);
+		return AntSteering::ReadSensors(Grid.Sample(Left, EPheromoneChannel::Food), Grid.Sample(Ahead, EPheromoneChannel::Food),
+			Grid.Sample(Right, EPheromoneChannel::Food), Settings.MinSensorValue).bTrailSensed;
 	}
 }
 
@@ -207,8 +217,9 @@ void UAntMoveProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutio
 	const FVector2D NestLocation = Colony->GetNestLocation();
 	const TConstArrayView<FVector2D> FoodLocations = Colony->GetFoodLocations();
 
+	const FPheromoneGrid& Grid = GridSubsystem->GetGrid();
 	FVector2D BoundsMin, BoundsMax;
-	GetAntBounds(GridSubsystem->GetGrid(), *Settings, BoundsMin, BoundsMax);
+	GetAntBounds(Grid, *Settings, BoundsMin, BoundsMax);
 
 	// This processor runs once per frame on the game thread, so it is the one that lets more ants out.
 	Colony->AdvanceEmergence(DeltaTime);
@@ -249,8 +260,10 @@ void UAntMoveProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutio
 				{
 					if (FVector2D::DistSquared(Position, FoodLocations[FoodIndex]) <= FoodRadiusSquared)
 					{
+						// Read the sensors before turning around: no Food trail here means a new find worth recruiting to.
+						const bool bFoodTrailSensed = SensesFoodTrail(Grid, Position, Ant.Yaw, *Settings);
 						ArriveAtTarget(Ant, EAntState::Returning);
-						Ant.bScout = false;
+						Ant.DepositBoost = AntSteering::GetRecruitBoost(bFoodTrailSensed, Settings->RecruitBoost);
 						++PickupsPerFood[FoodIndex];
 						break;
 					}
@@ -333,7 +346,7 @@ void UAntDepositProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 			{
 				continue;
 			}
-			GridSubsystem->Deposit(Transforms[EntityIt].GetTransform().GetLocation(), Channel, Rate * DeltaTime);
+			GridSubsystem->Deposit(Transforms[EntityIt].GetTransform().GetLocation(), Channel, Rate * Ant.DepositBoost * DeltaTime);
 		}
 	});
 }

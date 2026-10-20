@@ -36,7 +36,10 @@ struct SUPERCOLONY_API FAntFragment : public FMassFragment
 
 	EAntState State = EAntState::Searching;
 
-	/** Scouts ignore Food trails while searching. Cleared the first time the ant reaches food. */
+	/** Multiplies the Food laid on the current trip home: UAntSettings::RecruitBoost after finding an unmarked source. */
+	float DepositBoost = 1.f;
+
+	/** Scouts ignore Food trails while searching. Assigned at spawn and kept for life. */
 	bool bScout = false;
 
 	/** Each ant has its own stream so wander does not depend on processing order. */

@@ -39,7 +39,15 @@ void FPheromoneGrid::Deposit(const FVector2D& WorldLocation, EPheromoneChannel C
 	}
 
 	float& Value = Layers[static_cast<int32>(Channel)][ToIndex(Cell.X, Cell.Y)];
-	Value = FMath::Clamp(Value + Amount, 0.f, MaxCellValue);
+	if (Amount > 0.f)
+	{
+		// The Min only matters for single deposits of MaxCellValue or more; normal deposits stay below it on their own.
+		Value = FMath::Min(MaxCellValue, Value + Amount * (1.f - Value / MaxCellValue));
+	}
+	else
+	{
+		Value = FMath::Max(0.f, Value + Amount);
+	}
 }
 
 float FPheromoneGrid::Sample(const FVector2D& WorldLocation, EPheromoneChannel Channel) const

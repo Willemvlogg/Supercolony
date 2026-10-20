@@ -88,6 +88,13 @@ void UColonySubsystem::AddFoodPickups(int32 FoodIndex, int32 Amount)
 	}
 	Stats.Pickups += Amount;
 	Stats.PickupCounter.Add(Now, Amount);
+
+	if (Stats.TrailTime < 0.0 && Stats.PickupCounter.GetCount(Now) >= TrailPickupsPerMinute)
+	{
+		Stats.TrailTime = Now;
+		UE_LOG(LogTemp, Log, TEXT("Colony: trail to %s (%d pickups in a minute), %.1f s after it appeared."),
+			*Stats.Label, TrailPickupsPerMinute, Now - Stats.AppearedTime);
+	}
 }
 
 void UColonySubsystem::SpawnAnts(UWorld& InWorld)

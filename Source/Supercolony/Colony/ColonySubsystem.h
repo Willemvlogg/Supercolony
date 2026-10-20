@@ -18,6 +18,8 @@ struct FFoodSourceStats
 	double FirstPickupTime = -1.0;
 	int32 Pickups = 0;
 	FRollingEventCounter PickupCounter{ 60.0 };
+	/** Negative until pickups in the last minute first reach UColonySubsystem::TrailPickupsPerMinute. */
+	double TrailTime = -1.0;
 };
 
 /**
@@ -38,6 +40,9 @@ public:
 
 	void RegisterFoodSource(AFoodSourceActor& Source);
 	void UnregisterFoodSource(AFoodSourceActor& Source);
+
+	/** A food source counts as having a trail once this many pickups happen there within one minute. */
+	static constexpr int32 TrailPickupsPerMinute = 20;
 
 	/** Called by the ant movement processor when ants pick up food. FoodIndex matches GetFoodLocations(). */
 	void AddFoodPickups(int32 FoodIndex, int32 Amount);

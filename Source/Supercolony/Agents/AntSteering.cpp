@@ -110,6 +110,11 @@ namespace AntSteering
 		return 1.f + Random.FRandRange(-Variation, Variation);
 	}
 
+	float GetRecruitBoost(bool bFoodTrailSensed, float RecruitBoost)
+	{
+		return bFoodTrailSensed ? 1.f : FMath::Max(RecruitBoost, 1.f);
+	}
+
 	bool RollScout(float Fraction, FRandomStream& Random)
 	{
 		return Random.FRand() < Fraction;

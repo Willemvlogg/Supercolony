@@ -35,7 +35,11 @@ struct SUPERCOLONY_API FPheromoneGrid
 	bool WorldToCell(const FVector2D& WorldLocation, FIntPoint& OutCell) const;
 	FVector2D CellToWorld(const FIntPoint& Cell) const;
 
-	/** Adds Amount to the cell under WorldLocation, clamped to [0, MaxCellValue]. Ignored outside the grid. */
+	/**
+	 * Adds pheromone to the cell under WorldLocation with diminishing returns: a positive Amount adds
+	 * Amount * (1 - current / MaxCellValue), so busy trails keep a gradient instead of flattening at the cap.
+	 * The result never exceeds MaxCellValue. A negative Amount subtracts directly, down to 0. Ignored outside the grid.
+	 */
 	void Deposit(const FVector2D& WorldLocation, EPheromoneChannel Channel, float Amount);
 
 	/** Value of the cell under WorldLocation, or 0 outside the grid. */

@@ -40,7 +40,10 @@ void AColonyDebugHUD::DrawHUD()
 			const FString FirstPickup = Stats.FirstPickupTime >= 0.0
 				? FString::Printf(TEXT("first pickup %.0f s after it appeared"), Stats.FirstPickupTime - Stats.AppearedTime)
 				: FString::Printf(TEXT("no pickups yet (%.0f s)"), Now - Stats.AppearedTime);
-			Lines.Add(FString::Printf(TEXT("  %s: %d / min, %s"), *Stats.Label, Stats.PickupCounter.GetCount(Now), *FirstPickup));
+			const FString Trail = Stats.TrailTime >= 0.0
+				? FString::Printf(TEXT(", trail after %.0f s"), Stats.TrailTime - Stats.AppearedTime)
+				: FString();
+			Lines.Add(FString::Printf(TEXT("  %s: %d / min, %s%s"), *Stats.Label, Stats.PickupCounter.GetCount(Now), *FirstPickup, *Trail));
 		}
 	}
 

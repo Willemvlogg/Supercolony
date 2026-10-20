@@ -347,4 +347,19 @@ bool FAntScoutAssignmentTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntRecruitBoostTest, "Supercolony.Ants.RecruitBoost", AntSteeringTests::TestFlags)
+bool FAntRecruitBoostTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("No Food trail at the pickup: boosted trip home"), AntSteering::GetRecruitBoost(false, 3.f), 3.f);
+	TestEqual(TEXT("Existing Food trail: normal deposit"), AntSteering::GetRecruitBoost(true, 3.f), 1.f);
+	TestEqual(TEXT("A boost below 1 never weakens the trail"), AntSteering::GetRecruitBoost(false, 0.5f), 1.f);
+
+	// The decision uses the same sensing as steering: all three sensors below MinSensorValue means no trail.
+	TestEqual(TEXT("Faint Food below MinSensorValue counts as unmarked"),
+		AntSteering::GetRecruitBoost(AntSteering::ReadSensors(0.01f, 0.015f, 0.f, 0.02f).bTrailSensed, 3.f), 3.f);
+	TestEqual(TEXT("One sensor on a trail is enough to skip the boost"),
+		AntSteering::GetRecruitBoost(AntSteering::ReadSensors(0.f, 0.f, 0.05f, 0.02f).bTrailSensed, 3.f), 1.f);
+	return true;
+}
+
 #endif

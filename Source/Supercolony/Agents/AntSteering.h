@@ -70,6 +70,9 @@ namespace AntSteering
 	/** Per-ant speed multiplier in [1 - Variation, 1 + Variation]. */
 	SUPERCOLONY_API float RandomSpeedScale(float Variation, FRandomStream& Random);
 
+	/** Deposit multiplier for the trip home: RecruitBoost if no Food trail was sensed at the pickup, otherwise 1. */
+	SUPERCOLONY_API float GetRecruitBoost(bool bFoodTrailSensed, float RecruitBoost);
+
 	/** True for roughly Fraction of calls; used once per ant at spawn to pick scouts. */
 	SUPERCOLONY_API bool RollScout(float Fraction, FRandomStream& Random);
 

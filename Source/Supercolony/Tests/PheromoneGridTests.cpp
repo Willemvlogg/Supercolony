@@ -58,34 +58,58 @@ bool FPheromoneGridDepositTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Nothing else changes"), Grid.GetTotal(EPheromoneChannel::Food), 2.f);
 
 	Grid.Deposit(FVector2D(199.f, 201.f), EPheromoneChannel::Food, 1.5f);
-	TestEqual(TEXT("Deposits in the same cell add up"), Grid.Sample(FVector2D(150.f, 250.f), EPheromoneChannel::Food), 3.5f);
+	// Soft cap: 2 + 1.5 * (1 - 2 / 10) = 3.2.
+	TestEqual(TEXT("A second deposit in the same cell adds with diminishing returns"),
+		Grid.Sample(FVector2D(150.f, 250.f), EPheromoneChannel::Food), 3.2f, TestTolerance);
 
 	TestEqual(TEXT("Other channels are untouched"), Grid.GetTotal(EPheromoneChannel::Home), 0.f);
 
 	Grid.Deposit(FVector2D(-50.f, 250.f), EPheromoneChannel::Food, 5.f);
-	TestEqual(TEXT("Deposits outside the grid are ignored"), Grid.GetTotal(EPheromoneChannel::Food), 3.5f);
+	TestEqual(TEXT("Deposits outside the grid are ignored"), Grid.GetTotal(EPheromoneChannel::Food), 3.2f, TestTolerance);
 	TestEqual(TEXT("Sampling outside the grid returns 0"), Grid.Sample(FVector2D(-50.f, 250.f), EPheromoneChannel::Food), 0.f);
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPheromoneGridDepositClampTest, "Supercolony.Pheromones.DepositClamp", TestFlags)
-bool FPheromoneGridDepositClampTest::RunTest(const FString& Parameters)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPheromoneGridSoftCapTest, "Supercolony.Pheromones.SoftCap", TestFlags)
+bool FPheromoneGridSoftCapTest::RunTest(const FString& Parameters)
 {
 	FPheromoneGrid Grid = MakeGrid();
 	const FIntPoint Cell(4, 4);
 
 	DepositInCell(Grid, Cell, EPheromoneChannel::Home, 8.f);
+	TestEqual(TEXT("An empty cell takes the full amount"), Grid.GetCellValue(Cell, EPheromoneChannel::Home), 8.f, TestTolerance);
 	DepositInCell(Grid, Cell, EPheromoneChannel::Home, 8.f);
-	TestEqual(TEXT("Repeated deposits stop at MaxCellValue"), Grid.GetCellValue(Cell, EPheromoneChannel::Home), TestMaxValue);
+	TestEqual(TEXT("A second deposit adds Amount * (1 - current / max)"), Grid.GetCellValue(Cell, EPheromoneChannel::Home), 9.6f, TestTolerance);
 
-	DepositInCell(Grid, Cell, EPheromoneChannel::Home, 1000.f);
-	TestEqual(TEXT("A single huge deposit is clamped"), Grid.GetCellValue(Cell, EPheromoneChannel::Home), TestMaxValue);
+	bool bNeverAboveMax = true;
+	for (int32 Step = 0; Step < 1000; ++Step)
+	{
+		DepositInCell(Grid, Cell, EPheromoneChannel::Home, 5.f);
+		bNeverAboveMax &= Grid.GetCellValue(Cell, EPheromoneChannel::Home) <= TestMaxValue;
+	}
+	TestTrue(TEXT("Many deposits never exceed MaxCellValue"), bNeverAboveMax);
+	TestTrue(TEXT("Many deposits approach MaxCellValue"), Grid.GetCellValue(Cell, EPheromoneChannel::Home) > TestMaxValue - 0.01f);
 
-	DepositInCell(Grid, Cell, EPheromoneChannel::Home, -3.f);
-	TestEqual(TEXT("Negative amounts subtract"), Grid.GetCellValue(Cell, EPheromoneChannel::Home), 7.f);
+	const FIntPoint Empty(1, 1);
+	DepositInCell(Grid, Empty, EPheromoneChannel::Food, 1000.f);
+	TestEqual(TEXT("A single huge deposit never exceeds the max"), Grid.GetCellValue(Empty, EPheromoneChannel::Food), TestMaxValue);
 
-	DepositInCell(Grid, Cell, EPheromoneChannel::Home, -1000.f);
-	TestEqual(TEXT("Values never go below zero"), Grid.GetCellValue(Cell, EPheromoneChannel::Home), 0.f);
+	const FIntPoint Sparse(2, 2);
+	const FIntPoint Busy(7, 7);
+	DepositInCell(Grid, Sparse, EPheromoneChannel::Alarm, 2.f);
+	DepositInCell(Grid, Busy, EPheromoneChannel::Alarm, 8.f);
+	DepositInCell(Grid, Sparse, EPheromoneChannel::Alarm, 1.f);
+	DepositInCell(Grid, Busy, EPheromoneChannel::Alarm, 1.f);
+	const float SparseGain = Grid.GetCellValue(Sparse, EPheromoneChannel::Alarm) - 2.f;
+	const float BusyGain = Grid.GetCellValue(Busy, EPheromoneChannel::Alarm) - 8.f;
+	TestEqual(TEXT("Emptier cell gains 1 * (1 - 0.2)"), SparseGain, 0.8f, TestTolerance);
+	TestEqual(TEXT("Fuller cell gains 1 * (1 - 0.8)"), BusyGain, 0.2f, TestTolerance);
+	TestTrue(TEXT("A fuller cell gains less than an emptier one"), BusyGain < SparseGain);
+
+	DepositInCell(Grid, Busy, EPheromoneChannel::Alarm, -3.f);
+	TestEqual(TEXT("Negative amounts subtract directly"), Grid.GetCellValue(Busy, EPheromoneChannel::Alarm), 5.2f, TestTolerance);
+	DepositInCell(Grid, Busy, EPheromoneChannel::Alarm, -1000.f);
+	TestEqual(TEXT("Values never go below zero"), Grid.GetCellValue(Busy, EPheromoneChannel::Alarm), 0.f);
 	return true;
 }
 

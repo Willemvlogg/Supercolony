@@ -41,8 +41,8 @@ public:
 	float TurnRate = 240.f;
 
 	/**
-	 * Share of ants that are scouts. While searching, scouts ignore Food trails and always wander with WanderOffTrail,
-	 * so the colony keeps exploring after strong trails form. A scout becomes a normal ant once it reaches food.
+	 * Share of ants that are scouts, for good. While searching, scouts ignore Food trails and always wander with
+	 * WanderOffTrail, so the colony keeps exploring after strong trails form. Carrying food, they act like any ant.
 	 */
 	UPROPERTY(Config, EditAnywhere, Category = "Behaviour", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float ScoutFraction = 0.1f;
@@ -81,6 +81,13 @@ public:
 	/** Seconds for the deposit rate to fall to about 37% (1/e) of DepositAmount. */
 	UPROPERTY(Config, EditAnywhere, Category = "Pheromones", meta = (ClampMin = "0.1", Units = "Seconds"))
 	float DepositFalloffTime = 20.f;
+
+	/**
+	 * An ant that picks up food where its sensors find no Food trail has found something new, so its trip home
+	 * lays Food at this many times the normal amount. Recruits others to new sources before the trail fades.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category = "Pheromones", meta = (ClampMin = "1.0"))
+	float RecruitBoost = 3.f;
 
 	/** An ant that has not reached the nest or food for this long is lost and stops laying pheromone altogether. */
 	UPROPERTY(Config, EditAnywhere, Category = "Pheromones", meta = (ClampMin = "0.0", Units = "Seconds"))
