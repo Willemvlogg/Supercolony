@@ -18,8 +18,12 @@ namespace AntSteering
 		OutRight = Position + HeadingToDirection(Yaw + SensorAngle) * Distance;
 	}
 
-	float ChooseTurn(float Left, float Ahead, float Right)
+	float ChooseTurn(float Left, float Ahead, float Right, float MinValue)
 	{
+		Left = Left >= MinValue ? Left : 0.f;
+		Ahead = Ahead >= MinValue ? Ahead : 0.f;
+		Right = Right >= MinValue ? Right : 0.f;
+
 		if (Ahead >= Left && Ahead >= Right)
 		{
 			return 0.f;
@@ -73,8 +77,12 @@ namespace AntSteering
 		return bClamped;
 	}
 
-	float GetDepositRate(float BaseRate, float TimeSinceTarget, float FalloffTime)
+	float GetDepositRate(float BaseRate, float TimeSinceTarget, float FalloffTime, float MaxTrailTime)
 	{
+		if (TimeSinceTarget > MaxTrailTime)
+		{
+			return 0.f;
+		}
 		return BaseRate * FMath::Exp(-FMath::Max(TimeSinceTarget, 0.f) / FalloffTime);
 	}
 

@@ -65,6 +65,12 @@ bool FAntChooseTurnTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Ahead tied with a side goes straight"), AntSteering::ChooseTurn(2.f, 2.f, 1.f), 0.f);
 	TestEqual(TEXT("Left and right tied above ahead goes straight"), AntSteering::ChooseTurn(2.f, 1.f, 2.f), 0.f);
 	TestEqual(TEXT("Only one side has scent"), AntSteering::ChooseTurn(0.f, 0.f, 0.01f), 1.f);
+
+	TestEqual(TEXT("Faint side below MinValue is ignored"), AntSteering::ChooseTurn(0.f, 0.f, 0.01f, 0.02f), 0.f);
+	TestEqual(TEXT("Side at MinValue still counts"), AntSteering::ChooseTurn(0.f, 0.f, 0.02f, 0.02f), 1.f);
+	TestEqual(TEXT("Strong side wins over a faint ahead"), AntSteering::ChooseTurn(0.5f, 0.01f, 0.f, 0.02f), -1.f);
+	TestEqual(TEXT("Faint ahead no longer holds against a strong side"), AntSteering::ChooseTurn(0.f, 0.015f, 0.03f, 0.02f), 1.f);
+	TestEqual(TEXT("All faint goes straight"), AntSteering::ChooseTurn(0.01f, 0.015f, 0.019f, 0.02f), 0.f);
 	return true;
 }
 
@@ -161,6 +167,10 @@ bool FAntDepositRateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("1/e after one falloff time"), AntSteering::GetDepositRate(1.f, 20.f, 20.f), FMath::Exp(-1.f), AntSteeringTests::TestTolerance);
 	TestEqual(TEXT("Scales with the base rate"), AntSteering::GetDepositRate(2.f, 20.f, 20.f), 2.f * FMath::Exp(-1.f), AntSteeringTests::TestTolerance);
 	TestEqual(TEXT("Negative time counts as zero"), AntSteering::GetDepositRate(1.f, -5.f, 20.f), 1.f, AntSteeringTests::TestTolerance);
+
+	TestEqual(TEXT("Before MaxTrailTime the falloff applies"), AntSteering::GetDepositRate(1.f, 60.f, 20.f, 60.f), FMath::Exp(-3.f), AntSteeringTests::TestTolerance);
+	TestEqual(TEXT("Past MaxTrailTime a lost ant lays nothing"), AntSteering::GetDepositRate(1.f, 60.01f, 20.f, 60.f), 0.f);
+	TestEqual(TEXT("MaxTrailTime of zero only allows the first instant"), AntSteering::GetDepositRate(1.f, 0.1f, 20.f, 0.f), 0.f);
 
 	bool bDecreasing = true;
 	float Previous = AntSteering::GetDepositRate(1.f, 0.f, 20.f);

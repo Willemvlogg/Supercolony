@@ -121,7 +121,8 @@ void UAntSteerProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 			const EPheromoneChannel Channel = GetFollowedChannel(Ant.State);
 			FVector2D Left, Ahead, Right;
 			AntSteering::GetSensorPositions(Position, Ant.Yaw, SensorAngle, Settings->SensorDistance, Left, Ahead, Right);
-			const float Turn = AntSteering::ChooseTurn(Grid.Sample(Left, Channel), Grid.Sample(Ahead, Channel), Grid.Sample(Right, Channel));
+			const float Turn = AntSteering::ChooseTurn(Grid.Sample(Left, Channel), Grid.Sample(Ahead, Channel), Grid.Sample(Right, Channel),
+				Settings->MinSensorValue);
 
 			Ant.Yaw = AntSteering::WrapYaw(Ant.Yaw + Turn * MaxTurn);
 			Ant.Yaw = AntSteering::ApplyWander(Ant.Yaw, Settings->WanderStrength, TurnRate, DeltaTime, Ant.Random);
@@ -250,7 +251,12 @@ void UAntDepositProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 		for (FMassExecutionContext::FEntityIterator EntityIt = Context.CreateEntityIterator(); EntityIt; ++EntityIt)
 		{
 			const FAntFragment& Ant = Ants[EntityIt];
-			const float Rate = AntSteering::GetDepositRate(Settings->DepositAmount, Ant.TimeSinceTarget, Settings->DepositFalloffTime);
+			const float Rate = AntSteering::GetDepositRate(Settings->DepositAmount, Ant.TimeSinceTarget, Settings->DepositFalloffTime,
+				Settings->MaxTrailTime);
+			if (Rate <= 0.f)
+			{
+				continue;
+			}
 			GridSubsystem->Deposit(Transforms[EntityIt].GetTransform().GetLocation(), GetDepositedChannel(Ant.State), Rate * DeltaTime);
 		}
 	});

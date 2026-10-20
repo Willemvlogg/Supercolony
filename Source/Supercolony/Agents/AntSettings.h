@@ -44,6 +44,13 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Sensing", meta = (ClampMin = "0.0", Units = "Centimeters"))
 	float SensorDistance = 200.f;
 
+	/**
+	 * Sensor readings below this count as zero, so an ant on a faint, stale trail wanders instead of following it.
+	 * Stops old trails from trapping ants in loops. For scale: one fresh ant crossing a 50 cm cell lays about 0.125.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category = "Sensing", meta = (ClampMin = "0.0"))
+	float MinSensorValue = 0.02f;
+
 	/** Within this distance of its goal (food or nest), an ant ignores pheromones and heads straight for it. */
 	UPROPERTY(Config, EditAnywhere, Category = "Sensing", meta = (ClampMin = "0.0", Units = "Centimeters"))
 	float SightRadius = 300.f;
@@ -55,6 +62,10 @@ public:
 	/** Seconds for the deposit rate to fall to about 37% (1/e) of DepositAmount. */
 	UPROPERTY(Config, EditAnywhere, Category = "Pheromones", meta = (ClampMin = "0.1", Units = "Seconds"))
 	float DepositFalloffTime = 20.f;
+
+	/** An ant that has not reached the nest or food for this long is lost and stops laying pheromone altogether. */
+	UPROPERTY(Config, EditAnywhere, Category = "Pheromones", meta = (ClampMin = "0.0", Units = "Seconds"))
+	float MaxTrailTime = 60.f;
 
 	/** An ant this close to the nest centre has arrived. */
 	UPROPERTY(Config, EditAnywhere, Category = "Targets", meta = (ClampMin = "0.0", Units = "Centimeters"))

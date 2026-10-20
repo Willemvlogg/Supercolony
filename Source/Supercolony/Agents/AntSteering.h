@@ -22,9 +22,10 @@ namespace AntSteering
 
 	/**
 	 * Which way the sensors say to turn: -1 left, 0 straight, +1 right.
+	 * Readings below MinValue count as zero, so faint trails are ignored.
 	 * Straight when ahead is at least as strong as both sides, when all are zero, or when left and right tie.
 	 */
-	SUPERCOLONY_API float ChooseTurn(float Left, float Ahead, float Right);
+	SUPERCOLONY_API float ChooseTurn(float Left, float Ahead, float Right, float MinValue = 0.f);
 
 	/**
 	 * Adds a random turn. Strength is a fraction of TurnRate (radians per second).
@@ -42,8 +43,11 @@ namespace AntSteering
 	 */
 	SUPERCOLONY_API bool KeepInBounds(FVector2D& Position, float& Yaw, const FVector2D& Min, const FVector2D& Max);
 
-	/** Deposit per second: BaseRate * exp(-TimeSinceTarget / FalloffTime). Strongest right after leaving a target. */
-	SUPERCOLONY_API float GetDepositRate(float BaseRate, float TimeSinceTarget, float FalloffTime);
+	/**
+	 * Deposit per second: BaseRate * exp(-TimeSinceTarget / FalloffTime). Strongest right after leaving a target.
+	 * Zero once TimeSinceTarget passes MaxTrailTime: a lost ant lays nothing.
+	 */
+	SUPERCOLONY_API float GetDepositRate(float BaseRate, float TimeSinceTarget, float FalloffTime, float MaxTrailTime = UE_BIG_NUMBER);
 
 	/** Yaw wrapped into (-PI, PI]. */
 	SUPERCOLONY_API float WrapYaw(float Yaw);
