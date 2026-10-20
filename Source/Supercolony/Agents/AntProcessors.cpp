@@ -23,18 +23,31 @@ namespace
 		return State == EAntState::Searching ? EPheromoneChannel::Food : EPheromoneChannel::Home;
 	}
 
-	EPheromoneChannel GetDepositedChannel(EAntState State)
+	/** Searching lays Home, Returning lays Food, Homing lays nothing. Returns false when the ant lays nothing. */
+	bool GetDepositedChannel(EAntState State, EPheromoneChannel& OutChannel)
 	{
-		return State == EAntState::Searching ? EPheromoneChannel::Home : EPheromoneChannel::Food;
+		switch (State)
+		{
+		case EAntState::Searching: OutChannel = EPheromoneChannel::Home; return true;
+		case EAntState::Returning: OutChannel = EPheromoneChannel::Food; return true;
+		default:                   return false;
+		}
 	}
 
-	/** The nearest food source (Searching) or the nest (Returning), if within SightRadius. */
+	/** Where ants may walk: the pheromone grid minus BoundsMargin on every side. */
+	void GetAntBounds(const FPheromoneGrid& Grid, const UAntSettings& Settings, FVector2D& OutMin, FVector2D& OutMax)
+	{
+		OutMin = Grid.GetOrigin() + FVector2D(Settings.BoundsMargin);
+		OutMax = Grid.GetOrigin() + Grid.GetWorldSize() - FVector2D(Settings.BoundsMargin);
+	}
+
+	/** The nearest food source (Searching) or the nest (Returning, Homing), if within SightRadius. */
 	bool FindGoalInSight(EAntState State, const FVector2D& Position, const UColonySubsystem& Colony, float SightRadius, FVector2D& OutGoal)
 	{
 		float BestDistSquared = FMath::Square(SightRadius);
 		bool bFound = false;
 
-		if (State == EAntState::Returning)
+		if (State != EAntState::Searching)
 		{
 			const float DistSquared = FVector2D::DistSquared(Position, Colony.GetNestLocation());
 			if (DistSquared <= BestDistSquared)
@@ -58,7 +71,7 @@ namespace
 		return bFound;
 	}
 
-	/** Pick up food or drop it at the nest: switch state, turn around, restart the deposit falloff. */
+	/** Pick up food or come home: switch state, turn around, restart the deposit falloff. */
 	void ArriveAtTarget(FAntFragment& Ant, EAntState NewState)
 	{
 		Ant.State = NewState;
@@ -99,6 +112,11 @@ void UAntSteerProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 	const float TurnRate = FMath::DegreesToRadians(Settings->TurnRate);
 	const float MaxTurn = TurnRate * DeltaTime;
 	const float SensorAngle = FMath::DegreesToRadians(Settings->SensorAngle);
+	const FVector2D NestLocation = Colony->GetNestLocation();
+	const FEmergenceGate& Emergence = Colony->GetEmergence();
+
+	FVector2D BoundsMin, BoundsMax;
+	GetAntBounds(Grid, *Settings, BoundsMin, BoundsMax);
 
 	EntityQuery.ForEachEntityChunk(Context, [&](FMassExecutionContext& Context)
 	{
@@ -108,6 +126,10 @@ void UAntSteerProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 		for (FMassExecutionContext::FEntityIterator EntityIt = Context.CreateEntityIterator(); EntityIt; ++EntityIt)
 		{
 			FAntFragment& Ant = Ants[EntityIt];
+			if (!Emergence.IsReleased(Ant.EmergeIndex))
+			{
+				continue;
+			}
 			const FVector2D Position(Transforms[EntityIt].GetTransform().GetLocation());
 
 			FVector2D Goal;
@@ -115,17 +137,31 @@ void UAntSteerProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 			{
 				const FVector2D ToGoal = Goal - Position;
 				Ant.Yaw = AntSteering::TurnToward(Ant.Yaw, FMath::Atan2(ToGoal.Y, ToGoal.X), MaxTurn);
-				continue;
+			}
+			else
+			{
+				const EPheromoneChannel Channel = GetFollowedChannel(Ant.State);
+				FVector2D Left, Ahead, Right;
+				AntSteering::GetSensorPositions(Position, Ant.Yaw, SensorAngle, Settings->SensorDistance, Left, Ahead, Right);
+				const AntSteering::FSensorReading Reading = AntSteering::ReadSensors(
+					Grid.Sample(Left, Channel), Grid.Sample(Ahead, Channel), Grid.Sample(Right, Channel), Settings->MinSensorValue);
+
+				Ant.Yaw = AntSteering::WrapYaw(Ant.Yaw + Reading.Turn * MaxTurn);
+				if (Ant.State == EAntState::Homing && !Reading.bTrailSensed)
+				{
+					Ant.Yaw = AntSteering::ApplyHomingBias(Ant.Yaw, Position, NestLocation, Settings->HomingBias, TurnRate, DeltaTime);
+				}
+
+				const float Wander = AntSteering::GetWanderStrength(Reading.bTrailSensed, Settings->WanderOnTrail, Settings->WanderOffTrail);
+				Ant.Yaw = AntSteering::ApplyWander(Ant.Yaw, Wander, TurnRate, DeltaTime, Ant.Random);
 			}
 
-			const EPheromoneChannel Channel = GetFollowedChannel(Ant.State);
-			FVector2D Left, Ahead, Right;
-			AntSteering::GetSensorPositions(Position, Ant.Yaw, SensorAngle, Settings->SensorDistance, Left, Ahead, Right);
-			const float Turn = AntSteering::ChooseTurn(Grid.Sample(Left, Channel), Grid.Sample(Ahead, Channel), Grid.Sample(Right, Channel),
-				Settings->MinSensorValue);
-
-			Ant.Yaw = AntSteering::WrapYaw(Ant.Yaw + Turn * MaxTurn);
-			Ant.Yaw = AntSteering::ApplyWander(Ant.Yaw, Settings->WanderStrength, TurnRate, DeltaTime, Ant.Random);
+			FVector2D Away;
+			const float EdgeStrength = AntSteering::GetEdgeAvoidance(Position, BoundsMin, BoundsMax, Settings->EdgeAvoidDistance, Away);
+			if (EdgeStrength > 0.f)
+			{
+				Ant.Yaw = AntSteering::TurnToward(Ant.Yaw, FMath::Atan2(Away.Y, Away.X), EdgeStrength * MaxTurn);
+			}
 		}
 	});
 }
@@ -166,9 +202,12 @@ void UAntMoveProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutio
 	const FVector2D NestLocation = Colony->GetNestLocation();
 	const TConstArrayView<FVector2D> FoodLocations = Colony->GetFoodLocations();
 
-	const FPheromoneGrid& Grid = GridSubsystem->GetGrid();
-	const FVector2D BoundsMin = Grid.GetOrigin() + FVector2D(Settings->BoundsMargin);
-	const FVector2D BoundsMax = Grid.GetOrigin() + Grid.GetWorldSize() - FVector2D(Settings->BoundsMargin);
+	FVector2D BoundsMin, BoundsMax;
+	GetAntBounds(GridSubsystem->GetGrid(), *Settings, BoundsMin, BoundsMax);
+
+	// This processor runs once per frame on the game thread, so it is the one that lets more ants out.
+	Colony->AdvanceEmergence(DeltaTime);
+	const FEmergenceGate& Emergence = Colony->GetEmergence();
 
 	int32 Delivered = 0;
 	EntityQuery.ForEachEntityChunk(Context, [&](FMassExecutionContext& Context)
@@ -179,13 +218,24 @@ void UAntMoveProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutio
 		for (FMassExecutionContext::FEntityIterator EntityIt = Context.CreateEntityIterator(); EntityIt; ++EntityIt)
 		{
 			FAntFragment& Ant = Ants[EntityIt];
+			if (!Emergence.IsReleased(Ant.EmergeIndex))
+			{
+				continue;
+			}
 			FTransform& Transform = Transforms[EntityIt].GetMutableTransform();
 
-			FVector2D Position = FVector2D(Transform.GetLocation()) + AntSteering::HeadingToDirection(Ant.Yaw) * Step;
-			AntSteering::KeepInBounds(Position, Ant.Yaw, BoundsMin, BoundsMax);
+			FVector2D Position = FVector2D(Transform.GetLocation()) + AntSteering::HeadingToDirection(Ant.Yaw) * Step * Ant.SpeedScale;
+			AntSteering::ClampToBounds(Position, BoundsMin, BoundsMax);
 			Ant.TimeSinceTarget += DeltaTime;
 
-			if (Ant.State == EAntState::Searching)
+			if (AntSteering::ShouldGiveUpSearch(Ant.State == EAntState::Searching, Ant.TimeSinceTarget, Settings->MaxSearchTime))
+			{
+				// No turn-around: the Home trail or the homing bias brings it round gradually.
+				Ant.State = EAntState::Homing;
+			}
+
+			// Searching and homing ants both pick up food they walk into.
+			if (Ant.State != EAntState::Returning)
 			{
 				for (const FVector2D& Food : FoodLocations)
 				{
@@ -196,10 +246,15 @@ void UAntMoveProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutio
 					}
 				}
 			}
-			else if (FVector2D::DistSquared(Position, NestLocation) <= NestRadiusSquared)
+
+			// Returning ants drop food at the nest; homing ants just come in and set out again.
+			if (Ant.State != EAntState::Searching && FVector2D::DistSquared(Position, NestLocation) <= NestRadiusSquared)
 			{
+				if (Ant.State == EAntState::Returning)
+				{
+					++Delivered;
+				}
 				ArriveAtTarget(Ant, EAntState::Searching);
-				++Delivered;
 			}
 
 			Transform.SetLocation(FVector(Position, 0.f));
@@ -235,13 +290,15 @@ void UAntDepositProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 {
 	UWorld* World = Context.GetWorld();
 	UPheromoneGridSubsystem* GridSubsystem = World ? World->GetSubsystem<UPheromoneGridSubsystem>() : nullptr;
-	if (!GridSubsystem)
+	const UColonySubsystem* Colony = World ? World->GetSubsystem<UColonySubsystem>() : nullptr;
+	if (!GridSubsystem || !Colony)
 	{
 		return;
 	}
 
 	const UAntSettings* Settings = GetDefault<UAntSettings>();
 	const float DeltaTime = GetDeltaTime(Context);
+	const FEmergenceGate& Emergence = Colony->GetEmergence();
 
 	EntityQuery.ForEachEntityChunk(Context, [&](FMassExecutionContext& Context)
 	{
@@ -251,13 +308,18 @@ void UAntDepositProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 		for (FMassExecutionContext::FEntityIterator EntityIt = Context.CreateEntityIterator(); EntityIt; ++EntityIt)
 		{
 			const FAntFragment& Ant = Ants[EntityIt];
+			EPheromoneChannel Channel;
+			if (!Emergence.IsReleased(Ant.EmergeIndex) || !GetDepositedChannel(Ant.State, Channel))
+			{
+				continue;
+			}
 			const float Rate = AntSteering::GetDepositRate(Settings->DepositAmount, Ant.TimeSinceTarget, Settings->DepositFalloffTime,
 				Settings->MaxTrailTime);
 			if (Rate <= 0.f)
 			{
 				continue;
 			}
-			GridSubsystem->Deposit(Transforms[EntityIt].GetTransform().GetLocation(), GetDepositedChannel(Ant.State), Rate * DeltaTime);
+			GridSubsystem->Deposit(Transforms[EntityIt].GetTransform().GetLocation(), Channel, Rate * DeltaTime);
 		}
 	});
 }
@@ -306,10 +368,14 @@ void UAntRenderProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 
 		for (FMassExecutionContext::FEntityIterator EntityIt = Context.CreateEntityIterator(); EntityIt; ++EntityIt)
 		{
+			// Ants still inside the nest sit at its centre, hidden by the nest marker.
 			const FTransform& AntTransform = AntTransforms[EntityIt].GetTransform();
 			Transforms.Emplace(AntTransform.GetRotation(), AntTransform.GetLocation() + Lift, DotScale);
 
-			const FLinearColor& Color = Ants[EntityIt].State == EAntState::Returning ? Settings->CarryingColor : Settings->SearchingColor;
+			const EAntState State = Ants[EntityIt].State;
+			const FLinearColor& Color = State == EAntState::Returning ? Settings->CarryingColor
+				: State == EAntState::Homing ? Settings->HomingColor
+				: Settings->SearchingColor;
 			CustomData.Append({ Color.R, Color.G, Color.B });
 		}
 	});

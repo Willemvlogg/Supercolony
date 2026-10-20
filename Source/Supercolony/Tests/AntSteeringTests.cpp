@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "Agents/AntSteering.h"
+#include "Colony/EmergenceGate.h"
 #include "Colony/RollingEventCounter.h"
 #include "Math/RandomStream.h"
 
@@ -118,45 +119,23 @@ bool FAntTurnTowardTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntKeepInBoundsTest, "Supercolony.Ants.KeepInBounds", AntSteeringTests::TestFlags)
-bool FAntKeepInBoundsTest::RunTest(const FString& Parameters)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntClampToBoundsTest, "Supercolony.Ants.ClampToBounds", AntSteeringTests::TestFlags)
+bool FAntClampToBoundsTest::RunTest(const FString& Parameters)
 {
-	FVector2D Position(0.f, 0.f);
-	float Yaw = 0.3f;
-	TestFalse(TEXT("Inside the bounds nothing changes"), AntSteering::KeepInBounds(Position, Yaw, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax));
-	TestEqual(TEXT("Heading unchanged inside"), Yaw, 0.3f);
-
-	struct FWallCase
-	{
-		const TCHAR* Name;
-		FVector2D Position;
-		float YawDegrees;
-		FVector2D ExpectedPosition;
-		float ExpectedYawDegrees;
-	};
-	const FWallCase Cases[] =
-	{
-		{ TEXT("+X wall"), FVector2D(1010.f, 0.f), 30.f, FVector2D(1000.f, 0.f), 150.f },
-		{ TEXT("-X wall"), FVector2D(-1010.f, 0.f), 150.f, FVector2D(-1000.f, 0.f), 30.f },
-		{ TEXT("+Y wall"), FVector2D(0.f, 1010.f), 60.f, FVector2D(0.f, 1000.f), -60.f },
-		{ TEXT("-Y wall"), FVector2D(0.f, -1010.f), -60.f, FVector2D(0.f, -1000.f), 60.f },
-		{ TEXT("+X+Y corner"), FVector2D(1010.f, 1010.f), 45.f, FVector2D(1000.f, 1000.f), -135.f },
-		{ TEXT("-X-Y corner"), FVector2D(-1010.f, -1010.f), -135.f, FVector2D(-1000.f, -1000.f), 45.f },
-	};
-
-	for (const FWallCase& Case : Cases)
-	{
-		Position = Case.Position;
-		Yaw = FMath::DegreesToRadians(Case.YawDegrees);
-		TestTrue(FString::Printf(TEXT("%s: clamped"), Case.Name), AntSteering::KeepInBounds(Position, Yaw, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax));
-		TestTrue(FString::Printf(TEXT("%s: position"), Case.Name), Position.Equals(Case.ExpectedPosition, AntSteeringTests::TestTolerance));
-		TestTrue(FString::Printf(TEXT("%s: heading reflected"), Case.Name), AntSteeringTests::YawEquals(Yaw, FMath::DegreesToRadians(Case.ExpectedYawDegrees)));
-	}
+	FVector2D Position(10.f, -20.f);
+	TestFalse(TEXT("Inside the bounds nothing changes"), AntSteering::ClampToBounds(Position, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax));
+	TestTrue(TEXT("Inside position kept"), Position.Equals(FVector2D(10.f, -20.f)));
 
 	Position = FVector2D(1010.f, 0.f);
-	Yaw = FMath::DegreesToRadians(150.f);
-	AntSteering::KeepInBounds(Position, Yaw, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax);
-	TestTrue(TEXT("Already heading back in: heading kept"), AntSteeringTests::YawEquals(Yaw, FMath::DegreesToRadians(150.f)));
+	TestTrue(TEXT("Past +X is clamped"), AntSteering::ClampToBounds(Position, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax));
+	TestTrue(TEXT("+X clamp position"), Position.Equals(FVector2D(1000.f, 0.f)));
+
+	Position = FVector2D(-1010.f, -1010.f);
+	TestTrue(TEXT("Past a corner is clamped"), AntSteering::ClampToBounds(Position, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax));
+	TestTrue(TEXT("Corner clamp position"), Position.Equals(FVector2D(-1000.f, -1000.f)));
+
+	Position = FVector2D(1000.f, 1000.f);
+	TestFalse(TEXT("Exactly on the bounds is not a clamp"), AntSteering::ClampToBounds(Position, AntSteeringTests::BoundsMin, AntSteeringTests::BoundsMax));
 	return true;
 }
 
@@ -201,6 +180,131 @@ bool FRollingEventCounterTest::RunTest(const FString& Parameters)
 	Counter.Add(201.0, 5);
 	Counter.Reset();
 	TestEqual(TEXT("Reset clears the count"), Counter.GetCount(201.0), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntEdgeAvoidanceTest, "Supercolony.Ants.EdgeAvoidance", AntSteeringTests::TestFlags)
+bool FAntEdgeAvoidanceTest::RunTest(const FString& Parameters)
+{
+	using namespace AntSteeringTests;
+	constexpr float AvoidDistance = 300.f;
+	FVector2D Away;
+
+	TestEqual(TEXT("No push in the middle"), AntSteering::GetEdgeAvoidance(FVector2D::ZeroVector, BoundsMin, BoundsMax, AvoidDistance, Away), 0.f);
+	TestTrue(TEXT("No direction in the middle"), Away.IsZero());
+
+	TestEqual(TEXT("No push exactly at AvoidDistance"), AntSteering::GetEdgeAvoidance(FVector2D(700.f, 0.f), BoundsMin, BoundsMax, AvoidDistance, Away), 0.f);
+
+	TestEqual(TEXT("Half push half way in"), AntSteering::GetEdgeAvoidance(FVector2D(850.f, 0.f), BoundsMin, BoundsMax, AvoidDistance, Away), 0.5f, TestTolerance);
+	TestTrue(TEXT("+X wall pushes towards -X"), Away.Equals(FVector2D(-1.f, 0.f), TestTolerance));
+
+	TestEqual(TEXT("Full push at the wall"), AntSteering::GetEdgeAvoidance(FVector2D(0.f, -1000.f), BoundsMin, BoundsMax, AvoidDistance, Away), 1.f, TestTolerance);
+	TestTrue(TEXT("-Y wall pushes towards +Y"), Away.Equals(FVector2D(0.f, 1.f), TestTolerance));
+
+	AntSteering::GetEdgeAvoidance(FVector2D(-900.f, 0.f), BoundsMin, BoundsMax, AvoidDistance, Away);
+	TestTrue(TEXT("-X wall pushes towards +X"), Away.Equals(FVector2D(1.f, 0.f), TestTolerance));
+	AntSteering::GetEdgeAvoidance(FVector2D(0.f, 900.f), BoundsMin, BoundsMax, AvoidDistance, Away);
+	TestTrue(TEXT("+Y wall pushes towards -Y"), Away.Equals(FVector2D(0.f, -1.f), TestTolerance));
+
+	TestEqual(TEXT("Corner push is full strength"), AntSteering::GetEdgeAvoidance(FVector2D(1000.f, 1000.f), BoundsMin, BoundsMax, AvoidDistance, Away), 1.f, TestTolerance);
+	TestTrue(TEXT("Corner pushes diagonally inwards"), Away.Equals(FVector2D(-UE_INV_SQRT_2, -UE_INV_SQRT_2), TestTolerance));
+
+	TestEqual(TEXT("AvoidDistance of zero disables it"), AntSteering::GetEdgeAvoidance(FVector2D(1000.f, 0.f), BoundsMin, BoundsMax, 0.f, Away), 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntTrailSensingTest, "Supercolony.Ants.TrailSensing", AntSteeringTests::TestFlags)
+bool FAntTrailSensingTest::RunTest(const FString& Parameters)
+{
+	TestFalse(TEXT("Nothing sensed when all zero"), AntSteering::ReadSensors(0.f, 0.f, 0.f, 0.02f).bTrailSensed);
+	TestFalse(TEXT("Nothing sensed when all below MinValue"), AntSteering::ReadSensors(0.01f, 0.019f, 0.f, 0.02f).bTrailSensed);
+	TestTrue(TEXT("One sensor at MinValue counts"), AntSteering::ReadSensors(0.f, 0.02f, 0.f, 0.02f).bTrailSensed);
+	TestTrue(TEXT("Trail straight ahead is sensed but does not turn"), AntSteering::ReadSensors(0.f, 1.f, 0.f, 0.02f).bTrailSensed);
+	TestEqual(TEXT("ReadSensors turn matches ChooseTurn"), AntSteering::ReadSensors(0.1f, 0.f, 0.5f, 0.02f).Turn, AntSteering::ChooseTurn(0.1f, 0.f, 0.5f, 0.02f));
+
+	TestEqual(TEXT("On trail uses the on-trail wander"), AntSteering::GetWanderStrength(true, 0.15f, 0.5f), 0.15f);
+	TestEqual(TEXT("Off trail uses the off-trail wander"), AntSteering::GetWanderStrength(false, 0.15f, 0.5f), 0.5f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntHomingTest, "Supercolony.Ants.Homing", AntSteeringTests::TestFlags)
+bool FAntHomingTest::RunTest(const FString& Parameters)
+{
+	using namespace AntSteeringTests;
+	const float TurnRate = FMath::DegreesToRadians(240.f);
+	const float DeltaTime = 1.f / 60.f;
+	const float MaxStep = 0.3f * TurnRate * DeltaTime;
+
+	// Ant at +X facing +Y; the nest at the origin is directly behind-left (yaw 180).
+	const FVector2D Position(1000.f, 0.f);
+	const float Facing = FMath::DegreesToRadians(90.f);
+	const float Biased = AntSteering::ApplyHomingBias(Facing, Position, FVector2D::ZeroVector, 0.3f, TurnRate, DeltaTime);
+	TestTrue(TEXT("Turns towards the nest by Bias * TurnRate * DeltaTime"), YawEquals(Biased, Facing + MaxStep));
+
+	const float AlmostThere = FMath::DegreesToRadians(179.9f);
+	TestTrue(TEXT("Small gaps close fully"), YawEquals(AntSteering::ApplyHomingBias(AlmostThere, Position, FVector2D::ZeroVector, 0.3f, TurnRate, DeltaTime), UE_PI));
+	TestEqual(TEXT("Zero bias does nothing"), AntSteering::ApplyHomingBias(Facing, Position, FVector2D::ZeroVector, 0.f, TurnRate, DeltaTime), Facing);
+	TestEqual(TEXT("At the nest does nothing"), AntSteering::ApplyHomingBias(Facing, FVector2D::ZeroVector, FVector2D::ZeroVector, 0.3f, TurnRate, DeltaTime), Facing);
+
+	TestFalse(TEXT("Searching ant keeps going before MaxSearchTime"), AntSteering::ShouldGiveUpSearch(true, 44.9f, 45.f));
+	TestFalse(TEXT("Exactly MaxSearchTime is not yet giving up"), AntSteering::ShouldGiveUpSearch(true, 45.f, 45.f));
+	TestTrue(TEXT("Searching ant gives up after MaxSearchTime"), AntSteering::ShouldGiveUpSearch(true, 45.1f, 45.f));
+	TestFalse(TEXT("Returning or homing ants never give up"), AntSteering::ShouldGiveUpSearch(false, 1000.f, 45.f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntSpeedScaleTest, "Supercolony.Ants.SpeedScale", AntSteeringTests::TestFlags)
+bool FAntSpeedScaleTest::RunTest(const FString& Parameters)
+{
+	FRandomStream Random(99);
+	float Lowest = 2.f;
+	float Highest = 0.f;
+	for (int32 Index = 0; Index < 10000; ++Index)
+	{
+		const float Scale = AntSteering::RandomSpeedScale(0.2f, Random);
+		Lowest = FMath::Min(Lowest, Scale);
+		Highest = FMath::Max(Highest, Scale);
+	}
+	TestTrue(TEXT("Never below 1 - Variation"), Lowest >= 0.8f);
+	TestTrue(TEXT("Never above 1 + Variation"), Highest <= 1.2f);
+	TestTrue(TEXT("Uses most of the range"), Lowest < 0.81f && Highest > 1.19f);
+
+	FRandomStream RandomA(5);
+	FRandomStream RandomB(5);
+	TestEqual(TEXT("Same seed gives the same speed"), AntSteering::RandomSpeedScale(0.2f, RandomA), AntSteering::RandomSpeedScale(0.2f, RandomB));
+	TestEqual(TEXT("Zero variation is exactly 1"), AntSteering::RandomSpeedScale(0.f, Random), 1.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEmergenceGateTest, "Supercolony.Colony.EmergenceGate", AntSteeringTests::TestFlags)
+bool FEmergenceGateTest::RunTest(const FString& Parameters)
+{
+	FEmergenceGate Gate;
+	Gate.Reset(120);
+	TestEqual(TEXT("Nobody out before the first advance"), Gate.GetReleased(), 0);
+	TestFalse(TEXT("Ant 0 still inside"), Gate.IsReleased(0));
+
+	Gate.Advance(50.f, 1.f);
+	TestEqual(TEXT("50 per second for 1 s releases 50"), Gate.GetReleased(), 50);
+	TestTrue(TEXT("Ant 49 is out"), Gate.IsReleased(49));
+	TestFalse(TEXT("Ant 50 is still inside"), Gate.IsReleased(50));
+
+	// Half an ant per frame: nothing would ever come out unless the fraction carries over.
+	for (int32 Frame = 0; Frame < 100; ++Frame)
+	{
+		Gate.Advance(50.f, 0.01f);
+	}
+	TestEqual(TEXT("Fractions carry over between small frames"), Gate.GetReleased(), 100);
+
+	Gate.Advance(10.f, 1.f);
+	TestEqual(TEXT("A rate change applies from the next advance"), Gate.GetReleased(), 110);
+
+	Gate.Advance(50.f, 10.f);
+	TestEqual(TEXT("Never more than the total"), Gate.GetReleased(), 120);
+
+	Gate.Reset(30);
+	Gate.Advance(0.f, 0.01f);
+	TestEqual(TEXT("Rate 0 releases everyone at once"), Gate.GetReleased(), 30);
 	return true;
 }
 

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "EmergenceGate.h"
 #include "RollingEventCounter.h"
 #include "ColonySubsystem.generated.h"
 
@@ -39,6 +40,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Colony")
 	int32 GetAntCount() const { return AntCount; }
 
+	/** Ants that have left the nest so far. */
+	UFUNCTION(BlueprintPure, Category = "Colony")
+	int32 GetAntsOut() const { return Emergence.GetReleased(); }
+
+	/** Lets more ants out at UAntSettings::EmergeRate. Called once per frame by the ant movement processor. */
+	void AdvanceEmergence(float DeltaTime);
+
+	const FEmergenceGate& GetEmergence() const { return Emergence; }
+
 	AAntRenderActor* GetRenderActor() const { return RenderActor; }
 
 protected:
@@ -55,6 +65,7 @@ private:
 	int32 AntCount = 0;
 	int32 FoodDelivered = 0;
 	FRollingEventCounter FoodCounter{ 60.0 };
+	FEmergenceGate Emergence;
 	double SpawnTime = 0.0;
 
 	UPROPERTY(Transient)

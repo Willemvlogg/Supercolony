@@ -12,6 +12,8 @@ enum class EAntState : uint8
 	Searching,
 	/** Carrying food: lays Food, follows Home back to the nest. */
 	Returning,
+	/** Gave up searching: lays nothing, follows Home (or pulls gently towards the nest) and tries again. */
+	Homing,
 };
 
 /** Per-ant state. Position lives in FTransformFragment; this holds everything the ant behaviour needs on top. */
@@ -25,6 +27,12 @@ struct SUPERCOLONY_API FAntFragment : public FMassFragment
 
 	/** Seconds since the ant last left the nest or a food source. Drives the deposit falloff. */
 	float TimeSinceTarget = 0.f;
+
+	/** Multiplies UAntSettings::Speed, so ants do not all move in lockstep. */
+	float SpeedScale = 1.f;
+
+	/** Order in which this ant leaves the nest; it stays inside until UColonySubsystem has released this many. */
+	int32 EmergeIndex = 0;
 
 	EAntState State = EAntState::Searching;
 

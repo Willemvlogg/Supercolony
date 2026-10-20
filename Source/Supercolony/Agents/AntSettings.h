@@ -21,6 +21,10 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Spawning", meta = (ClampMin = "0", ClampMax = "100000"))
 	int32 AntCount = 500;
 
+	/** Ants leaving the nest per second after the level starts. 0 lets them all out at once. */
+	UPROPERTY(Config, EditAnywhere, Category = "Spawning", meta = (ClampMin = "0.0"))
+	float EmergeRate = 50.f;
+
 	/** Entity config used to spawn ants. Only needs UAntTrait. */
 	UPROPERTY(Config, EditAnywhere, Category = "Spawning")
 	TSoftObjectPtr<UMassEntityConfigAsset> AntEntityConfig;
@@ -28,13 +32,21 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0", Units = "CentimetersPerSecond"))
 	float Speed = 400.f;
 
+	/** Each ant gets its own speed within Speed * (1 +- SpeedVariation). 0.2 means +-20%. */
+	UPROPERTY(Config, EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0", ClampMax = "0.9"))
+	float SpeedVariation = 0.2f;
+
 	/** Fastest an ant turns when following sensors or heading for something in sight. Wander is added on top. */
 	UPROPERTY(Config, EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0", Units = "DegreesPerSecond"))
 	float TurnRate = 240.f;
 
-	/** Random turning as a fraction of TurnRate. 0 walks straight lines, 1 is as strong as a sensor turn. */
+	/** Random turning, as a fraction of TurnRate, while a sensor picks up the trail being followed. */
 	UPROPERTY(Config, EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0"))
-	float WanderStrength = 0.3f;
+	float WanderOnTrail = 0.15f;
+
+	/** Random turning, as a fraction of TurnRate, while no trail is sensed and the ant is exploring. */
+	UPROPERTY(Config, EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0"))
+	float WanderOffTrail = 0.5f;
 
 	/** Angle of the left and right sensors either side of the heading. */
 	UPROPERTY(Config, EditAnywhere, Category = "Sensing", meta = (ClampMin = "0.0", ClampMax = "90.0", Units = "Degrees"))
@@ -67,6 +79,17 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Pheromones", meta = (ClampMin = "0.0", Units = "Seconds"))
 	float MaxTrailTime = 60.f;
 
+	/** A searching ant that has not found food for this long gives up and heads home (Homing), then tries again. */
+	UPROPERTY(Config, EditAnywhere, Category = "Behaviour", meta = (ClampMin = "0.0", Units = "Seconds"))
+	float MaxSearchTime = 45.f;
+
+	/**
+	 * When a homing ant senses no Home trail, it turns towards the nest at this fraction of TurnRate.
+	 * Off-trail wander is still added, so the path home is a gentle curve rather than a straight line.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category = "Behaviour", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float HomingBias = 0.3f;
+
 	/** An ant this close to the nest centre has arrived. */
 	UPROPERTY(Config, EditAnywhere, Category = "Targets", meta = (ClampMin = "0.0", Units = "Centimeters"))
 	float NestRadius = 150.f;
@@ -78,6 +101,10 @@ public:
 	/** Ants stay at least this far inside the pheromone grid edge. */
 	UPROPERTY(Config, EditAnywhere, Category = "Targets", meta = (ClampMin = "0.0", Units = "Centimeters"))
 	float BoundsMargin = 50.f;
+
+	/** Within this distance of the bounds, ants start turning away; the closer they get, the harder they turn. */
+	UPROPERTY(Config, EditAnywhere, Category = "Targets", meta = (ClampMin = "0.0", Units = "Centimeters"))
+	float EdgeAvoidDistance = 300.f;
 
 	/** Mesh drawn for each ant, scaled to DotSize. Assumed to be 100 cm across, like the engine basic shapes. */
 	UPROPERTY(Config, EditAnywhere, Category = "Display")
@@ -96,4 +123,8 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Display")
 	FLinearColor CarryingColor = FLinearColor(1.f, 0.35f, 0.f);
+
+	/** Ants that gave up searching and are heading home empty-handed. */
+	UPROPERTY(Config, EditAnywhere, Category = "Display")
+	FLinearColor HomingColor = FLinearColor(0.2f, 0.35f, 0.7f);
 };

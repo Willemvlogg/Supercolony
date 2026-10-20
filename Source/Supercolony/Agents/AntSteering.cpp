@@ -18,21 +18,34 @@ namespace AntSteering
 		OutRight = Position + HeadingToDirection(Yaw + SensorAngle) * Distance;
 	}
 
-	float ChooseTurn(float Left, float Ahead, float Right, float MinValue)
+	FSensorReading ReadSensors(float Left, float Ahead, float Right, float MinValue)
 	{
 		Left = Left >= MinValue ? Left : 0.f;
 		Ahead = Ahead >= MinValue ? Ahead : 0.f;
 		Right = Right >= MinValue ? Right : 0.f;
 
+		FSensorReading Reading;
+		Reading.bTrailSensed = Left > 0.f || Ahead > 0.f || Right > 0.f;
 		if (Ahead >= Left && Ahead >= Right)
 		{
-			return 0.f;
+			return Reading;
 		}
 		if (Left == Right)
 		{
-			return 0.f;
+			return Reading;
 		}
-		return Right > Left ? 1.f : -1.f;
+		Reading.Turn = Right > Left ? 1.f : -1.f;
+		return Reading;
+	}
+
+	float ChooseTurn(float Left, float Ahead, float Right, float MinValue)
+	{
+		return ReadSensors(Left, Ahead, Right, MinValue).Turn;
+	}
+
+	float GetWanderStrength(bool bTrailSensed, float OnTrail, float OffTrail)
+	{
+		return bTrailSensed ? OnTrail : OffTrail;
 	}
 
 	float ApplyWander(float Yaw, float Strength, float TurnRate, float DeltaTime, FRandomStream& Random)
@@ -47,34 +60,59 @@ namespace AntSteering
 		return WrapYaw(Yaw + FMath::Clamp(Delta, -MaxStep, MaxStep));
 	}
 
-	bool KeepInBounds(FVector2D& Position, float& Yaw, const FVector2D& Min, const FVector2D& Max)
+	float ApplyHomingBias(float Yaw, const FVector2D& Position, const FVector2D& Nest, float Bias, float TurnRate, float DeltaTime)
 	{
-		const FVector2D Direction = HeadingToDirection(Yaw);
-		bool bClamped = false;
-
-		if (Position.X <= Min.X || Position.X >= Max.X)
+		const FVector2D ToNest = Nest - Position;
+		if (Bias <= 0.f || ToNest.IsNearlyZero())
 		{
-			const bool bMovingOut = Position.X <= Min.X ? Direction.X < 0.f : Direction.X > 0.f;
-			if (bMovingOut)
-			{
-				Yaw = WrapYaw(UE_PI - Yaw);
-			}
-			Position.X = FMath::Clamp(Position.X, Min.X, Max.X);
-			bClamped = true;
+			return Yaw;
+		}
+		return TurnToward(Yaw, FMath::Atan2(ToNest.Y, ToNest.X), Bias * TurnRate * DeltaTime);
+	}
+
+	float GetEdgeAvoidance(const FVector2D& Position, const FVector2D& Min, const FVector2D& Max, float AvoidDistance,
+		FVector2D& OutAway)
+	{
+		OutAway = FVector2D::ZeroVector;
+		if (AvoidDistance <= 0.f)
+		{
+			return 0.f;
 		}
 
-		if (Position.Y <= Min.Y || Position.Y >= Max.Y)
+		// Each wall pushes inwards with 1 - distance / AvoidDistance, clamped to [0, 1].
+		auto Push = [AvoidDistance](float DistanceToWall)
 		{
-			const bool bMovingOut = Position.Y <= Min.Y ? Direction.Y < 0.f : Direction.Y > 0.f;
-			if (bMovingOut)
-			{
-				Yaw = WrapYaw(-Yaw);
-			}
-			Position.Y = FMath::Clamp(Position.Y, Min.Y, Max.Y);
-			bClamped = true;
-		}
+			return FMath::Clamp(1.f - DistanceToWall / AvoidDistance, 0.f, 1.f);
+		};
+		const FVector2D Away(
+			Push(Position.X - Min.X) - Push(Max.X - Position.X),
+			Push(Position.Y - Min.Y) - Push(Max.Y - Position.Y));
 
+		const float Strength = FMath::Min(1.f, FMath::Max(FMath::Abs(Away.X), FMath::Abs(Away.Y)));
+		if (Strength <= 0.f)
+		{
+			return 0.f;
+		}
+		OutAway = Away.GetSafeNormal();
+		return Strength;
+	}
+
+	bool ClampToBounds(FVector2D& Position, const FVector2D& Min, const FVector2D& Max)
+	{
+		const FVector2D Clamped(FMath::Clamp(Position.X, Min.X, Max.X), FMath::Clamp(Position.Y, Min.Y, Max.Y));
+		const bool bClamped = Clamped != Position;
+		Position = Clamped;
 		return bClamped;
+	}
+
+	float RandomSpeedScale(float Variation, FRandomStream& Random)
+	{
+		return 1.f + Random.FRandRange(-Variation, Variation);
+	}
+
+	bool ShouldGiveUpSearch(bool bSearching, float TimeSinceTarget, float MaxSearchTime)
+	{
+		return bSearching && TimeSinceTarget > MaxSearchTime;
 	}
 
 	float GetDepositRate(float BaseRate, float TimeSinceTarget, float FalloffTime, float MaxTrailTime)

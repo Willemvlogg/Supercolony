@@ -25,7 +25,7 @@ void AColonyDebugHUD::DrawHUD()
 
 	if (UColonySubsystem* Colony = GetWorld()->GetSubsystem<UColonySubsystem>())
 	{
-		Lines.Add(FString::Printf(TEXT("Ants: %d"), Colony->GetAntCount()));
+		Lines.Add(FString::Printf(TEXT("Ants: %d out / %d"), Colony->GetAntsOut(), Colony->GetAntCount()));
 		Lines.Add(FString::Printf(TEXT("Food delivered: %d"), Colony->GetFoodDelivered()));
 
 		const float Elapsed = Colony->GetSecondsSinceSpawn();

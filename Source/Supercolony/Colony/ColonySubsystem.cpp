@@ -5,6 +5,7 @@
 #include "Agents/AntFragments.h"
 #include "Agents/AntRenderActor.h"
 #include "Agents/AntSettings.h"
+#include "Agents/AntSteering.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntitySubsystem.h"
 #include "MassSpawnerSubsystem.h"
@@ -80,6 +81,8 @@ void UColonySubsystem::SpawnAnts(UWorld& InWorld)
 		FAntFragment& Ant = EntityManager.GetFragmentDataChecked<FAntFragment>(Entities[Index]);
 		Ant.Random.Initialize(BaseSeed + Index);
 		Ant.Yaw = Ant.Random.FRandRange(-UE_PI, UE_PI);
+		Ant.SpeedScale = AntSteering::RandomSpeedScale(Settings->SpeedVariation, Ant.Random);
+		Ant.EmergeIndex = Index;
 		Ant.State = EAntState::Searching;
 		Ant.TimeSinceTarget = 0.f;
 
@@ -87,8 +90,14 @@ void UColonySubsystem::SpawnAnts(UWorld& InWorld)
 	}
 
 	AntCount = Entities.Num();
+	Emergence.Reset(AntCount);
 	SpawnTime = InWorld.GetTimeSeconds();
 	UE_LOG(LogTemp, Log, TEXT("Colony: spawned %d ants at the nest, %d food sources."), AntCount, FoodLocations.Num());
+}
+
+void UColonySubsystem::AdvanceEmergence(float DeltaTime)
+{
+	Emergence.Advance(GetDefault<UAntSettings>()->EmergeRate, DeltaTime);
 }
 
 void UColonySubsystem::AddFoodDelivered(int32 Amount)
