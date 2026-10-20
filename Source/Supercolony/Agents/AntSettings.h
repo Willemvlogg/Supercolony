@@ -77,11 +77,12 @@ public:
 	TSoftObjectPtr<UMaterialInterface> DotMaterial;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Display", meta = (ClampMin = "1.0", Units = "Centimeters"))
-	float DotSize = 25.f;
+	float DotSize = 40.f;
+
+	/** Dark so it reads against the light default floor and the pheromone overlay. */
+	UPROPERTY(Config, EditAnywhere, Category = "Display")
+	FLinearColor SearchingColor = FLinearColor(0.02f, 0.02f, 0.02f);
 
 	UPROPERTY(Config, EditAnywhere, Category = "Display")
-	FLinearColor SearchingColor = FLinearColor(0.9f, 0.9f, 0.9f);
-
-	UPROPERTY(Config, EditAnywhere, Category = "Display")
-	FLinearColor CarryingColor = FLinearColor(1.f, 0.6f, 0.f);
+	FLinearColor CarryingColor = FLinearColor(1.f, 0.35f, 0.f);
 };
