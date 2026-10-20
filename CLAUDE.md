@@ -42,6 +42,30 @@ Close the editor or disable Live Coding before building from the command line, o
 
 Adjust paths if the engine or project live elsewhere.
 
+## Rebuild cycle
+
+Follow this whenever a build needs the editor closed (new UCLASS/USTRUCT/UPROPERTY, new files, Build.cs changes).
+
+a. Through MCP: stop PIE if it is running (`EditorAppToolset.StopPIE`), then save all dirty maps and assets (`AssetTools.save_assets` with an empty list).
+b–e. Run `powershell -File Tools\Editor\RebuildCycle.ps1`. It:
+   - b. quits the editor with `unreal.SystemLibrary.quit_editor()` through Python Remote Execution (`Tools/Editor/editor_python.py`) and waits for `UnrealEditor` to exit. It force-kills only after 60 s and prints `FORCE-KILLED` — tell Willem if that happens.
+   - c. builds `SupercolonyEditor` and runs every `Supercolony.*` automation test headless. On a failed build it stops without relaunching (exit 1); failed tests exit 2.
+   - d. relaunches the editor with `C:\Dev\Supercolony\Supercolony.uproject` on `/Game/Maps/M1_Swarm`.
+   - e. waits up to 2 minutes for the MCP server to answer (exit 3 if not).
+f. Confirm the Claude Code connection with a read-only Unreal tool call (e.g. `SceneTools.get_current_level`). If it does not reconnect within 2 minutes, stop and ask Willem to run `/mcp` and reconnect `unreal-mcp`.
+
+Setup this relies on:
+- MCP auto-start: `bAutoStartServer=True` in `Saved/Config/WindowsEditor/EditorPerProjectUserSettings.ini` (per user, not in git).
+- Python Remote Execution: enabled in Project Settings > Plugins > Python (`DefaultEngine.ini`). Bound to 127.0.0.1 with multicast TTL 0, so only processes on this machine can reach it.
+- Epic's `unreal_mcp_proxy` is not in the UE 5.8 launcher build (`Engine/Plugins/Experimental/ModelContextProtocol/Extras/Proxy` is missing), so Claude Code connects to the editor over plain HTTP and may need `/mcp` reconnect after a restart.
+
+## Git
+
+- Commit and push after every checkpoint where the build is clean and all tests pass, with a short descriptive message.
+- Never commit when the build fails or tests fail.
+- Never force-push, rewrite history or delete branches.
+- Tell Willem each commit message after pushing.
+
 ## Safety rules
 
 - Assume Willem has committed before the session; remind him if the working tree has uncommitted changes before large edits.
