@@ -138,6 +138,11 @@ void UAntSteerProcessor::Execute(FMassEntityManager& EntityManager, FMassExecuti
 				const FVector2D ToGoal = Goal - Position;
 				Ant.Yaw = AntSteering::TurnToward(Ant.Yaw, FMath::Atan2(ToGoal.Y, ToGoal.X), MaxTurn);
 			}
+			else if (Ant.bScout && Ant.State == EAntState::Searching)
+			{
+				// Scouts explore: no trail following, always the off-trail wander.
+				Ant.Yaw = AntSteering::ApplyWander(Ant.Yaw, Settings->WanderOffTrail, TurnRate, DeltaTime, Ant.Random);
+			}
 			else
 			{
 				const EPheromoneChannel Channel = GetFollowedChannel(Ant.State);
@@ -210,6 +215,9 @@ void UAntMoveProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutio
 	const FEmergenceGate& Emergence = Colony->GetEmergence();
 
 	int32 Delivered = 0;
+	TArray<int32, TInlineAllocator<8>> PickupsPerFood;
+	PickupsPerFood.SetNumZeroed(FoodLocations.Num());
+
 	EntityQuery.ForEachEntityChunk(Context, [&](FMassExecutionContext& Context)
 	{
 		const TArrayView<FAntFragment> Ants = Context.GetMutableFragmentView<FAntFragment>();
@@ -237,11 +245,13 @@ void UAntMoveProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutio
 			// Searching and homing ants both pick up food they walk into.
 			if (Ant.State != EAntState::Returning)
 			{
-				for (const FVector2D& Food : FoodLocations)
+				for (int32 FoodIndex = 0; FoodIndex < FoodLocations.Num(); ++FoodIndex)
 				{
-					if (FVector2D::DistSquared(Position, Food) <= FoodRadiusSquared)
+					if (FVector2D::DistSquared(Position, FoodLocations[FoodIndex]) <= FoodRadiusSquared)
 					{
 						ArriveAtTarget(Ant, EAntState::Returning);
+						Ant.bScout = false;
+						++PickupsPerFood[FoodIndex];
 						break;
 					}
 				}
@@ -265,6 +275,10 @@ void UAntMoveProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutio
 	if (Delivered > 0)
 	{
 		Colony->AddFoodDelivered(Delivered);
+	}
+	for (int32 FoodIndex = 0; FoodIndex < PickupsPerFood.Num(); ++FoodIndex)
+	{
+		Colony->AddFoodPickups(FoodIndex, PickupsPerFood[FoodIndex]);
 	}
 }
 
@@ -372,9 +386,10 @@ void UAntRenderProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
 			const FTransform& AntTransform = AntTransforms[EntityIt].GetTransform();
 			Transforms.Emplace(AntTransform.GetRotation(), AntTransform.GetLocation() + Lift, DotScale);
 
-			const EAntState State = Ants[EntityIt].State;
-			const FLinearColor& Color = State == EAntState::Returning ? Settings->CarryingColor
-				: State == EAntState::Homing ? Settings->HomingColor
+			const FAntFragment& Ant = Ants[EntityIt];
+			const FLinearColor& Color = Ant.State == EAntState::Returning ? Settings->CarryingColor
+				: Ant.State == EAntState::Homing ? Settings->HomingColor
+				: Ant.bScout ? Settings->ScoutColor
 				: Settings->SearchingColor;
 			CustomData.Append({ Color.R, Color.G, Color.B });
 		}

@@ -110,6 +110,11 @@ namespace AntSteering
 		return 1.f + Random.FRandRange(-Variation, Variation);
 	}
 
+	bool RollScout(float Fraction, FRandomStream& Random)
+	{
+		return Random.FRand() < Fraction;
+	}
+
 	bool ShouldGiveUpSearch(bool bSearching, float TimeSinceTarget, float MaxSearchTime)
 	{
 		return bSearching && TimeSinceTarget > MaxSearchTime;

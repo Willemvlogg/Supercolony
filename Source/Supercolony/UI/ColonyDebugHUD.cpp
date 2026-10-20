@@ -32,6 +32,16 @@ void AColonyDebugHUD::DrawHUD()
 		Lines.Add(Elapsed < 60.f
 			? FString::Printf(TEXT("Food / min: %d (first %.0f s)"), Colony->GetFoodLastMinute(), Elapsed)
 			: FString::Printf(TEXT("Food / min: %d"), Colony->GetFoodLastMinute()));
+
+		// One line per food source, so you can see when a trail to a new source has formed.
+		const double Now = GetWorld()->GetTimeSeconds();
+		for (FFoodSourceStats& Stats : Colony->GetFoodSourceStats())
+		{
+			const FString FirstPickup = Stats.FirstPickupTime >= 0.0
+				? FString::Printf(TEXT("first pickup %.0f s after it appeared"), Stats.FirstPickupTime - Stats.AppearedTime)
+				: FString::Printf(TEXT("no pickups yet (%.0f s)"), Now - Stats.AppearedTime);
+			Lines.Add(FString::Printf(TEXT("  %s: %d / min, %s"), *Stats.Label, Stats.PickupCounter.GetCount(Now), *FirstPickup));
+		}
 	}
 
 	UFont* Font = GEngine->GetMediumFont();

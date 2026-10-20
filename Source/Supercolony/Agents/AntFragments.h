@@ -36,6 +36,9 @@ struct SUPERCOLONY_API FAntFragment : public FMassFragment
 
 	EAntState State = EAntState::Searching;
 
+	/** Scouts ignore Food trails while searching. Cleared the first time the ant reaches food. */
+	bool bScout = false;
+
 	/** Each ant has its own stream so wander does not depend on processing order. */
 	FRandomStream Random;
 };

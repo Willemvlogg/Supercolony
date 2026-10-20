@@ -308,4 +308,43 @@ bool FEmergenceGateTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAntScoutAssignmentTest, "Supercolony.Ants.ScoutAssignment", AntSteeringTests::TestFlags)
+bool FAntScoutAssignmentTest::RunTest(const FString& Parameters)
+{
+	// Mirrors spawning: each ant has its own stream, seeded from a base seed plus its index.
+	auto CountScouts = [](int32 BaseSeed, int32 NumAnts, float Fraction)
+	{
+		int32 Scouts = 0;
+		for (int32 Index = 0; Index < NumAnts; ++Index)
+		{
+			FRandomStream Random(BaseSeed + Index);
+			Scouts += AntSteering::RollScout(Fraction, Random) ? 1 : 0;
+		}
+		return Scouts;
+	};
+
+	constexpr int32 NumAnts = 5000;
+	for (const float Fraction : { 0.1f, 0.25f, 0.5f })
+	{
+		// Binomial standard deviation for 5,000 ants at 10% is about 0.4%; 2% is a safe tolerance.
+		const float Share = static_cast<float>(CountScouts(1234, NumAnts, Fraction)) / NumAnts;
+		TestTrue(FString::Printf(TEXT("Scout share %.3f is within 0.02 of %.2f"), Share, Fraction), FMath::Abs(Share - Fraction) < 0.02f);
+	}
+
+	TestEqual(TEXT("Same seed gives the same scouts"), CountScouts(77, NumAnts, 0.1f), CountScouts(77, NumAnts, 0.1f));
+
+	bool bSameAnts = true;
+	for (int32 Index = 0; Index < 200; ++Index)
+	{
+		FRandomStream RandomA(500 + Index);
+		FRandomStream RandomB(500 + Index);
+		bSameAnts &= AntSteering::RollScout(0.1f, RandomA) == AntSteering::RollScout(0.1f, RandomB);
+	}
+	TestTrue(TEXT("Same seed picks the same individual ants"), bSameAnts);
+
+	TestEqual(TEXT("Fraction 0 gives no scouts"), CountScouts(1, 1000, 0.f), 0);
+	TestEqual(TEXT("Fraction 1 makes every ant a scout"), CountScouts(1, 1000, 1.f), 1000);
+	return true;
+}
+
 #endif

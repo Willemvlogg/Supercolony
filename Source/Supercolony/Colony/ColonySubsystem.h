@@ -7,10 +7,22 @@
 #include "ColonySubsystem.generated.h"
 
 class AAntRenderActor;
+class AFoodSourceActor;
+
+/** Per food source counters, shown on the HUD so you can see when a trail to a source has formed. */
+struct FFoodSourceStats
+{
+	FString Label;
+	double AppearedTime = 0.0;
+	/** Negative until the first ant picks food up here. */
+	double FirstPickupTime = -1.0;
+	int32 Pickups = 0;
+	FRollingEventCounter PickupCounter{ 60.0 };
+};
 
 /**
- * The player's colony for a game or PIE world. On begin play it records where the nest and food sources are,
- * spawns UAntSettings::AntCount ants at the nest, and from then on counts the food they bring home.
+ * The player's colony for a game or PIE world. On begin play it finds the nest and spawns UAntSettings::AntCount
+ * ants there. Food sources register themselves (also when spawned later), and it counts the food brought home.
  */
 UCLASS()
 class SUPERCOLONY_API UColonySubsystem : public UWorldSubsystem
@@ -23,6 +35,15 @@ public:
 	bool HasNest() const { return bHasNest; }
 	FVector2D GetNestLocation() const { return NestLocation; }
 	TConstArrayView<FVector2D> GetFoodLocations() const { return FoodLocations; }
+
+	void RegisterFoodSource(AFoodSourceActor& Source);
+	void UnregisterFoodSource(AFoodSourceActor& Source);
+
+	/** Called by the ant movement processor when ants pick up food. FoodIndex matches GetFoodLocations(). */
+	void AddFoodPickups(int32 FoodIndex, int32 Amount);
+
+	/** Same order as GetFoodLocations(). Mutable because the per-minute counters drop old entries when read. */
+	TArray<FFoodSourceStats>& GetFoodSourceStats() { return FoodStats; }
 
 	/** Called by the ant movement processor when ants drop food at the nest. */
 	void AddFoodDelivered(int32 Amount);
@@ -61,6 +82,8 @@ private:
 	bool bHasNest = false;
 	FVector2D NestLocation = FVector2D::ZeroVector;
 	TArray<FVector2D> FoodLocations;
+	TArray<TWeakObjectPtr<AFoodSourceActor>> FoodSources;
+	TArray<FFoodSourceStats> FoodStats;
 
 	int32 AntCount = 0;
 	int32 FoodDelivered = 0;

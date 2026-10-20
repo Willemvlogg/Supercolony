@@ -1,5 +1,6 @@
 #include "PheromoneGridSubsystem.h"
 #include "PheromoneSettings.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 namespace
 {
@@ -34,6 +35,9 @@ void UPheromoneGridSubsystem::Tick(float DeltaTime)
 
 void UPheromoneGridSubsystem::Step(float StepSeconds)
 {
+	// Named scope so the grid step shows up on its own in Unreal Insights.
+	TRACE_CPUPROFILER_EVENT_SCOPE(PheromoneGrid_Step);
+
 	const UPheromoneSettings* Settings = GetDefault<UPheromoneSettings>();
 	for (const EPheromoneChannel Channel : TEnumRange<EPheromoneChannel>())
 	{

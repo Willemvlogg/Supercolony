@@ -41,11 +41,53 @@ void UColonySubsystem::FindTargets(UWorld& InWorld)
 		NestLocation = FVector2D(It->GetActorLocation());
 		bHasNest = true;
 	}
+}
 
-	for (TActorIterator<AFoodSourceActor> It(&InWorld); It; ++It)
+void UColonySubsystem::RegisterFoodSource(AFoodSourceActor& Source)
+{
+	if (FoodSources.Contains(&Source))
 	{
-		FoodLocations.Add(FVector2D(It->GetActorLocation()));
+		return;
 	}
+
+	const FVector2D Location(Source.GetActorLocation());
+	FoodLocations.Add(Location);
+	FoodSources.Add(&Source);
+
+	FFoodSourceStats& Stats = FoodStats.AddDefaulted_GetRef();
+	Stats.Label = Source.GetActorNameOrLabel();
+	Stats.AppearedTime = GetWorld()->GetTimeSeconds();
+
+	UE_LOG(LogTemp, Log, TEXT("Colony: food source %s at (%.1f, %.1f) m."), *Stats.Label, Location.X / 100.f, Location.Y / 100.f);
+}
+
+void UColonySubsystem::UnregisterFoodSource(AFoodSourceActor& Source)
+{
+	const int32 Index = FoodSources.IndexOfByKey(&Source);
+	if (Index != INDEX_NONE)
+	{
+		FoodLocations.RemoveAt(Index);
+		FoodSources.RemoveAt(Index);
+		FoodStats.RemoveAt(Index);
+	}
+}
+
+void UColonySubsystem::AddFoodPickups(int32 FoodIndex, int32 Amount)
+{
+	if (!FoodStats.IsValidIndex(FoodIndex) || Amount <= 0)
+	{
+		return;
+	}
+
+	const double Now = GetWorld()->GetTimeSeconds();
+	FFoodSourceStats& Stats = FoodStats[FoodIndex];
+	if (Stats.FirstPickupTime < 0.0)
+	{
+		Stats.FirstPickupTime = Now;
+		UE_LOG(LogTemp, Log, TEXT("Colony: first pickup from %s, %.1f s after it appeared."), *Stats.Label, Now - Stats.AppearedTime);
+	}
+	Stats.Pickups += Amount;
+	Stats.PickupCounter.Add(Now, Amount);
 }
 
 void UColonySubsystem::SpawnAnts(UWorld& InWorld)
@@ -83,6 +125,7 @@ void UColonySubsystem::SpawnAnts(UWorld& InWorld)
 		Ant.Yaw = Ant.Random.FRandRange(-UE_PI, UE_PI);
 		Ant.SpeedScale = AntSteering::RandomSpeedScale(Settings->SpeedVariation, Ant.Random);
 		Ant.EmergeIndex = Index;
+		Ant.bScout = AntSteering::RollScout(Settings->ScoutFraction, Ant.Random);
 		Ant.State = EAntState::Searching;
 		Ant.TimeSinceTarget = 0.f;
 
@@ -92,7 +135,7 @@ void UColonySubsystem::SpawnAnts(UWorld& InWorld)
 	AntCount = Entities.Num();
 	Emergence.Reset(AntCount);
 	SpawnTime = InWorld.GetTimeSeconds();
-	UE_LOG(LogTemp, Log, TEXT("Colony: spawned %d ants at the nest, %d food sources."), AntCount, FoodLocations.Num());
+	UE_LOG(LogTemp, Log, TEXT("Colony: spawned %d ants at the nest."), AntCount);
 }
 
 void UColonySubsystem::AdvanceEmergence(float DeltaTime)

@@ -70,6 +70,9 @@ namespace AntSteering
 	/** Per-ant speed multiplier in [1 - Variation, 1 + Variation]. */
 	SUPERCOLONY_API float RandomSpeedScale(float Variation, FRandomStream& Random);
 
+	/** True for roughly Fraction of calls; used once per ant at spawn to pick scouts. */
+	SUPERCOLONY_API bool RollScout(float Fraction, FRandomStream& Random);
+
 	/** A searching ant gives up and heads home once it has gone MaxSearchTime without finding food. */
 	SUPERCOLONY_API bool ShouldGiveUpSearch(bool bSearching, float TimeSinceTarget, float MaxSearchTime);
 

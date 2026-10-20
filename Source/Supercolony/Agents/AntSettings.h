@@ -40,6 +40,13 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0", Units = "DegreesPerSecond"))
 	float TurnRate = 240.f;
 
+	/**
+	 * Share of ants that are scouts. While searching, scouts ignore Food trails and always wander with WanderOffTrail,
+	 * so the colony keeps exploring after strong trails form. A scout becomes a normal ant once it reaches food.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category = "Behaviour", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float ScoutFraction = 0.1f;
+
 	/** Random turning, as a fraction of TurnRate, while a sensor picks up the trail being followed. */
 	UPROPERTY(Config, EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0"))
 	float WanderOnTrail = 0.15f;
@@ -123,6 +130,10 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Display")
 	FLinearColor CarryingColor = FLinearColor(1.f, 0.35f, 0.f);
+
+	/** Searching scouts: close to SearchingColor so the swarm still reads as one, but tinted so scouts can be spotted. */
+	UPROPERTY(Config, EditAnywhere, Category = "Display")
+	FLinearColor ScoutColor = FLinearColor(0.35f, 0.05f, 0.4f);
 
 	/** Ants that gave up searching and are heading home empty-handed. */
 	UPROPERTY(Config, EditAnywhere, Category = "Display")
